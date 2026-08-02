@@ -127,7 +127,7 @@ export default function SalesHistoryPage() {
           <div className="flex justify-center py-20"><Spinner size={8} /></div>
         ) : (
           <Table
-            columns={columns as Parameters<typeof Table>[0]["columns"]}
+            columns={columns as unknown as Parameters<typeof Table>[0]["columns"]}
             rows={sales as unknown as Record<string, unknown>[]}
             keyField={"id" as never}
             emptyMessage="No sales found for this date range."
