@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { api } from "@/lib/api";
 import { getBranchId } from "@/lib/auth";
 import type { Sale } from "@/lib/types";
@@ -114,10 +115,17 @@ export default function SalesHistoryPage() {
         <div className="flex items-center justify-between mb-6">
           <h1>Sales history</h1>
           <div className="flex gap-2 items-center">
+            <Link href="/sales/pos" className="btn-primary btn-sm flex items-center gap-1.5">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 7V5a2 2 0 0 0-4 0v2M8 7V5a2 2 0 0 0-4 0v2" />
+              </svg>
+              Go to POS
+            </Link>
+            <span className="w-px h-5 bg-border" />
             <input type="date" className="input w-36" value={start} onChange={(e) => setStart(e.target.value)} />
             <span className="text-slate-400 text-sm">to</span>
             <input type="date" className="input w-36" value={end} onChange={(e) => setEnd(e.target.value)} />
-            <button className="btn-primary btn-sm" onClick={load} disabled={loading}>
+            <button className="btn-secondary btn-sm" onClick={load} disabled={loading}>
               {loading ? <Spinner size={4} /> : "Load"}
             </button>
           </div>

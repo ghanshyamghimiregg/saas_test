@@ -176,6 +176,12 @@ export default function InventoryPage() {
       <div className="flex items-center justify-between mb-6">
         <h1>Inventory</h1>
         <div className="flex gap-2">
+          <Link href="/sales/pos" className="btn-secondary btn-sm flex items-center gap-1.5">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 7V5a2 2 0 0 0-4 0v2M8 7V5a2 2 0 0 0-4 0v2" />
+            </svg>
+            Go to POS
+          </Link>
           <button
             className="btn-secondary btn-sm"
             onClick={handlePrintLabels}

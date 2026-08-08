@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useRef, useCallback, FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { api } from "@/lib/api";
 import { getBranchId } from "@/lib/auth";
 import type { FrameProduct, CartItem, Customer, Sale } from "@/lib/types";
@@ -319,6 +320,14 @@ export default function POSPage() {
                   <Spinner size={4} />
                 </span>
               )}
+            </div>
+            <div className="mt-2 flex justify-end">
+              <Link href="/stock/inventory" className="btn-secondary btn-sm flex items-center gap-1.5">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" />
+                </svg>
+                Go to Inventory
+              </Link>
             </div>
           </div>
 
