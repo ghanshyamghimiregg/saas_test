@@ -35,7 +35,7 @@ function QuickAddModal({
   onAdded:     (product: FrameProduct) => void;
   onClose:     () => void;
 }) {
-  const [name,     setName]     = useState(initialName);
+  const [name,     setName]     = useState("");
   const [price,    setPrice]    = useState("");
   const [quantity, setQuantity] = useState("1");
   const [brand,    setBrand]    = useState("");
@@ -43,17 +43,23 @@ function QuickAddModal({
   const [saving,   setSaving]   = useState(false);
   const [error,    setError]    = useState<string | null>(null);
 
-  // Reset fields when modal opens with a new name
+  // Snapshot the name ONCE when the modal opens — never reset it while the user
+  // is typing, even if the parent's scanInput / quickAddName state keeps changing.
+  const didInit = useRef(false);
   useEffect(() => {
-    if (open) {
+    if (open && !didInit.current) {
       setName(initialName);
       setPrice("");
       setQuantity("1");
       setBrand("");
       setCategory("");
       setError(null);
+      didInit.current = true;
     }
-  }, [open, initialName]);
+    if (!open) {
+      didInit.current = false;
+    }
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();

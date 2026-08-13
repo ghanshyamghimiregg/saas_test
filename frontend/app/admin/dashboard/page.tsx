@@ -252,9 +252,7 @@ export default function AdminDashboard() {
                   ) : (summary?.branches ?? []).map((b) => (
                     <tr key={b.branch_id} className="hover:bg-canvas/60 transition-colors">
                       <td className="table-cell">
-                        <div className="font-medium text-ink leading-snug">
-                          {b.branch_name !== b.branch_code ? b.branch_name : "—"}
-                        </div>
+                        <div className="font-medium text-ink leading-snug">{b.branch_name}</div>
                         <div className="mt-0.5">
                           <span className="badge-blue font-mono tracking-wide text-2xs">
                             {b.branch_code}

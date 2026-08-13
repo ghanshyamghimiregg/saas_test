@@ -1,9 +1,11 @@
+"use client";
 /**
  * Single shared layout for all branch pages: /stock/* and /sales/*
  *
- * By placing both route segments inside this (branch) route group,
- * Next.js keeps this layout mounted when navigating between them —
- * the sidebar never remounts and no state is lost.
+ * Must be "use client" — BranchShell holds sidebar open/close state.
+ * Marking this as a client component ensures React keeps this layout
+ * instance alive across navigations between /stock/* and /sales/*,
+ * giving seamless page switching without sidebar remount.
  */
 import { BranchShell } from "@/components/BranchSidebar";
 
