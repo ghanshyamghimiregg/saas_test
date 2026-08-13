@@ -61,7 +61,7 @@ function LoginForm() {
               <circle cx="18" cy="12" r="4"/>
               <path d="M10 12h4"/>
             </svg>
-            <span className="text-xl font-semibold tracking-tight text-ink">OptiStore</span>
+            <span className="text-xl font-semibold tracking-tight text-ink">Chasma Pasal</span>
           </div>
           <p className="text-sm text-ink-muted">
             {isBranch

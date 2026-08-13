@@ -17,9 +17,191 @@ const DISCOUNT_TYPES = [
   { value: "membership_tier",  label: "Membership tier" },
 ] as const;
 
-type DiscountType   = typeof DISCOUNT_TYPES[number]["value"];
-type PaymentMethod  = "cash" | "online_pending";
+type DiscountType  = typeof DISCOUNT_TYPES[number]["value"];
+type PaymentMethod = "cash" | "online_pending";
 
+// ── Quick-add product modal ────────────────────────────────────────────────────
+// Minimal fields needed to add a new product from the POS and sell it immediately.
+function QuickAddModal({
+  open,
+  initialName,
+  branchId,
+  onAdded,
+  onClose,
+}: {
+  open:        boolean;
+  initialName: string;
+  branchId:    string;
+  onAdded:     (product: FrameProduct) => void;
+  onClose:     () => void;
+}) {
+  const [name,     setName]     = useState(initialName);
+  const [price,    setPrice]    = useState("");
+  const [quantity, setQuantity] = useState("1");
+  const [brand,    setBrand]    = useState("");
+  const [category, setCategory] = useState("");
+  const [saving,   setSaving]   = useState(false);
+  const [error,    setError]    = useState<string | null>(null);
+
+  // Reset fields when modal opens with a new name
+  useEffect(() => {
+    if (open) {
+      setName(initialName);
+      setPrice("");
+      setQuantity("1");
+      setBrand("");
+      setCategory("");
+      setError(null);
+    }
+  }, [open, initialName]);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (!name.trim())         { setError("Product name is required"); return; }
+    if (!price || Number(price) <= 0) { setError("Selling price is required"); return; }
+    if (!quantity || Number(quantity) < 1) { setError("Quantity must be at least 1"); return; }
+
+    setSaving(true);
+    try {
+      // Auto-generate a product code from name + timestamp
+      const ts          = Date.now().toString(36).toUpperCase();
+      const productCode = `${name.trim().slice(0, 4).toUpperCase().replace(/\s/g, "")}-${ts}`;
+
+      const product = await api.post<FrameProduct>("/inventory/frames", {
+        branch_id:    branchId,
+        name:         name.trim(),
+        selling_price: Number(price),
+        quantity:     Number(quantity),
+        brand:        brand.trim() || null,
+        category:     category || null,
+        product_code: productCode,
+      });
+
+      onAdded(product);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to add product");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title="Add new product to inventory" size="sm">
+      <div className="space-y-4">
+        {/* Context banner */}
+        <div className="alert-info text-xs flex items-start gap-2">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="shrink-0 mt-0.5" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          <span>
+            Product not in inventory. Fill in the essentials — it will be added to stock and placed in your cart.
+          </span>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-3" noValidate>
+          {/* Name */}
+          <div>
+            <label htmlFor="qa-name" className="label label-required">Product name</label>
+            <input
+              id="qa-name"
+              className="input"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              autoFocus
+            />
+          </div>
+
+          {/* Price + Qty side by side */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="qa-price" className="label label-required">Selling price (NPR)</label>
+              <input
+                id="qa-price"
+                type="number"
+                step="1"
+                min="0"
+                className="input-mono"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                placeholder="0"
+                inputMode="numeric"
+                required
+              />
+            </div>
+            <div>
+              <label htmlFor="qa-qty" className="label label-required">Quantity</label>
+              <input
+                id="qa-qty"
+                type="number"
+                step="1"
+                min="1"
+                className="input-mono"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+                inputMode="numeric"
+                required
+              />
+            </div>
+          </div>
+
+          {/* Brand */}
+          <div>
+            <label htmlFor="qa-brand" className="label">Brand</label>
+            <input
+              id="qa-brand"
+              className="input"
+              value={brand}
+              onChange={(e) => setBrand(e.target.value)}
+              placeholder="Optional"
+            />
+          </div>
+
+          {/* Category */}
+          <div>
+            <label htmlFor="qa-cat" className="label">Category</label>
+            <select
+              id="qa-cat"
+              className="input"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+            >
+              <option value="">— optional —</option>
+              {["sunglasses", "optical_frame", "contact_lens", "reading_glasses", "lens_only", "accessories"].map((c) => (
+                <option key={c} value={c}>{c.replace(/_/g, " ")}</option>
+              ))}
+            </select>
+          </div>
+
+          {error && (
+            <div role="alert" className="field-error">{error}</div>
+          )}
+
+          <div className="flex gap-2 pt-1">
+            <button
+              type="button"
+              className="btn-secondary flex-1"
+              onClick={onClose}
+              disabled={saving}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn-primary flex-1"
+              disabled={saving}
+            >
+              {saving ? <Spinner size={4} /> : "Add & sell"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </Modal>
+  );
+}
+
+// ── Main POS page ──────────────────────────────────────────────────────────────
 export default function POSPage() {
   const router   = useRouter();
   const { toast, show, dismiss } = useToast();
@@ -58,6 +240,12 @@ export default function POSPage() {
   // Mobile: cart drawer open
   const [cartOpen, setCartOpen] = useState(false);
 
+  // Quick-add: when search returns no results, offer to add the item to stock
+  const [quickAddOpen,    setQuickAddOpen]    = useState(false);
+  const [quickAddName,    setQuickAddName]    = useState("");
+  // Track whether last search returned zero results (enables the "add it" prompt)
+  const [searchExhausted, setSearchExhausted] = useState(false);
+
   // Auto-focus scan input on mount only — do NOT re-focus on re-renders
   // (that would steal focus from discount dropdown, cash input, etc.)
   useEffect(() => { scanRef.current?.focus(); }, []);
@@ -87,6 +275,7 @@ export default function POSPage() {
     async (q: string) => {
       if (!branchId || !q) return;
       setSearchLoading(true);
+      setSearchExhausted(false);
       try {
         try {
           const frame = await api.get<FrameProduct>(`/inventory/frames/scan/${encodeURIComponent(q)}`);
@@ -98,6 +287,10 @@ export default function POSPage() {
           `/inventory/frames/search?branch_id=${branchId}&q=${encodeURIComponent(q)}&limit=10`,
         );
         setSearchResults(results);
+        // If text search also returns nothing, show the "add to inventory" prompt
+        if (results.length === 0) {
+          setSearchExhausted(true);
+        }
       } catch (e: unknown) {
         show(e instanceof Error ? e.message : "Search failed", "error");
       } finally {
@@ -109,7 +302,11 @@ export default function POSPage() {
 
   // Debounced type-ahead (not scanner — scanner uses Enter)
   useEffect(() => {
-    if (!scanInput || scanInput.length < 2) { setSearchResults([]); return; }
+    if (!scanInput || scanInput.length < 2) {
+      setSearchResults([]);
+      setSearchExhausted(false);
+      return;
+    }
     if (scanTimerRef.current) clearTimeout(scanTimerRef.current);
     scanTimerRef.current = setTimeout(() => handleProductSearch(scanInput), 350);
     return () => { if (scanTimerRef.current) clearTimeout(scanTimerRef.current); };
@@ -141,6 +338,16 @@ export default function POSPage() {
 
   function removeFromCart(frameId: string) {
     setCart((prev) => prev.filter((c) => c.frame.id !== frameId));
+  }
+
+  function handleQuickAdded(product: FrameProduct) {
+    setQuickAddOpen(false);
+    setSearchExhausted(false);
+    setScanInput("");
+    setSearchResults([]);
+    // Add the newly created product directly to cart
+    addToCart(product);
+    show(`"${product.name}" added to inventory and cart`, "success");
   }
 
   function clearCart() {
@@ -468,8 +675,8 @@ export default function POSPage() {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <>
-      {/* Desktop split-panel */}
-      <div className="hidden md:flex h-[calc(100dvh-52px)] overflow-hidden">
+      {/* Desktop split-panel — full viewport height, sidebar handles its own space */}
+      <div className="hidden md:flex h-dvh overflow-hidden">
 
         {/* LEFT — scan + search */}
         <div className="flex-1 flex flex-col border-r border-border overflow-hidden">
@@ -551,6 +758,31 @@ export default function POSPage() {
                   </li>
                 ))}
               </ul>
+            ) : searchExhausted ? (
+              /* ── No results: offer to add to inventory ── */
+              <div className="flex flex-col items-center justify-center h-full select-none py-16 px-4 text-center">
+                <div className="w-12 h-12 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center mb-4">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/><path d="M11 8v6M8 11h6"/>
+                  </svg>
+                </div>
+                <p className="text-sm font-medium text-ink mb-1">
+                  &ldquo;{scanInput}&rdquo; not found in inventory
+                </p>
+                <p className="text-xs text-ink-faint mb-4">
+                  Add it to stock now and sell it immediately
+                </p>
+                <button
+                  type="button"
+                  className="btn-primary btn-sm flex items-center gap-2"
+                  onClick={() => { setQuickAddName(scanInput); setQuickAddOpen(true); }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                    <path d="M12 5v14M5 12h14"/>
+                  </svg>
+                  Add to inventory &amp; sell
+                </button>
+              </div>
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-ink-faint select-none py-16">
                 <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.25" aria-hidden="true" className="mb-3 opacity-30">
@@ -579,7 +811,7 @@ export default function POSPage() {
       </div>
 
       {/* Mobile layout — search full-width, cart as slide-up drawer */}
-      <div className="md:hidden flex flex-col h-[calc(100dvh-52px)] overflow-hidden">
+      <div className="md:hidden flex flex-col h-[calc(100dvh-48px)] overflow-hidden">
 
         {/* Scan bar */}
         <div className="p-3 border-b border-border bg-white shrink-0">
@@ -629,14 +861,36 @@ export default function POSPage() {
                 </li>
               ))}
             </ul>
-          ) : (
+          ) : searchExhausted ? (
+              <div className="flex flex-col items-center justify-center h-full select-none py-12 px-4 text-center">
+                <div className="w-11 h-11 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center mb-3">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/><path d="M11 8v6M8 11h6"/>
+                  </svg>
+                </div>
+                <p className="text-sm font-medium text-ink mb-1">
+                  &ldquo;{scanInput}&rdquo; not found
+                </p>
+                <p className="text-xs text-ink-faint mb-4">Add it to inventory and sell</p>
+                <button
+                  type="button"
+                  className="btn-primary btn-sm flex items-center gap-2"
+                  onClick={() => { setQuickAddName(scanInput); setQuickAddOpen(true); }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                    <path d="M12 5v14M5 12h14"/>
+                  </svg>
+                  Add &amp; sell
+                </button>
+              </div>
+            ) : (
             <div className="flex flex-col items-center justify-center h-full text-ink-faint py-12">
               <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.25" aria-hidden="true" className="mb-2 opacity-30">
                 <circle cx="6" cy="12" r="4"/><circle cx="18" cy="12" r="4"/><path d="M10 12h4"/>
               </svg>
               <p className="text-sm">Scan or search a product</p>
             </div>
-          )}
+            )}
         </div>
 
         {/* Persistent cart summary bar */}
@@ -764,6 +1018,17 @@ export default function POSPage() {
       </Modal>
 
       {toast && <Toast message={toast.message} type={toast.type} onDismiss={dismiss} />}
+
+      {/* Quick-add product from POS */}
+      {branchId && (
+        <QuickAddModal
+          open={quickAddOpen}
+          initialName={quickAddName}
+          branchId={branchId}
+          onAdded={handleQuickAdded}
+          onClose={() => setQuickAddOpen(false)}
+        />
+      )}
     </>
   );
 }
