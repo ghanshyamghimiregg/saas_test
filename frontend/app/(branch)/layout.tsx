@@ -1,18 +1,9 @@
-"use client";
-/**
- * Single shared layout for all branch pages: /stock/* and /sales/*
- *
- * Must be "use client" — BranchShell holds sidebar open/close state.
- * Marking this as a client component ensures React keeps this layout
- * instance alive across navigations between /stock/* and /sales/*,
- * giving seamless page switching without sidebar remount.
- */
+// Server component layout — do NOT add "use client" here.
+// Next.js 14 layouts MUST be server components to preserve across navigations.
+// BranchShell is a client component imported from components/ — that boundary
+// is correct: server layout → client shell → client pages.
 import { BranchShell } from "@/components/BranchSidebar";
 
 export default function BranchLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <BranchShell>
-      {children}
-    </BranchShell>
-  );
+  return <BranchShell>{children}</BranchShell>;
 }

@@ -211,6 +211,10 @@ function QuickAddModal({
 export default function POSPage() {
   const router   = useRouter();
   const { toast, show, dismiss } = useToast();
+  // Stable ref — prevents show() from being a dep of handleProductSearch
+  // which would recreate it on every render and re-trigger the debounce
+  const showRef = useRef(show);
+  useEffect(() => { showRef.current = show; }, [show]);
   const branchId = getBranchId();
 
   // Search / scan
@@ -297,12 +301,12 @@ export default function POSPage() {
         setSearchResults(results);
         setSearchExhausted(results.length === 0);
       } catch (e: unknown) {
-        show(e instanceof Error ? e.message : "Search failed", "error");
+        showRef.current(e instanceof Error ? e.message : "Search failed", "error");
       } finally {
         setSearchLoading(false);
       }
     },
-    [branchId, show], // eslint-disable-line
+    [branchId], // eslint-disable-line
   );
 
   // Debounced type-ahead (not scanner — scanner uses Enter)
