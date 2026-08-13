@@ -9,6 +9,8 @@ import { Toast, useToast } from "@/components/ui/Toast";
 
 interface BranchSummary {
   branch_id:   string;
+  branch_name: string;
+  branch_code: string;
   revenue:     number;
   sales_count: number;
   discount:    number;
@@ -30,6 +32,8 @@ interface LowStockItem {
 }
 
 type Period = "daily" | "weekly" | "monthly" | "yearly";
+
+import type { Branch } from "@/lib/types";
 
 // ── KPI Card ──────────────────────────────────────────────────────────────────
 function KPI({
@@ -104,10 +108,19 @@ export default function AdminDashboard() {
   const [period,        setPeriod]        = useState<Period>("daily");
   const [summary,       setSummary]       = useState<AllBranchesSummary | null>(null);
   const [lowStock,      setLowStock]      = useState<LowStockItem[]>([]);
+  const [branches,      setBranches]      = useState<Branch[]>([]);
   const [loading,       setLoading]       = useState(true);
   const [exportLoading, setExportLoading] = useState(false);
   const [exportStart,   setExportStart]   = useState(new Date().toISOString().split("T")[0]);
   const [exportEnd,     setExportEnd]     = useState(new Date().toISOString().split("T")[0]);
+
+  // Build a id→name lookup map for branch name resolution
+  const branchMap = Object.fromEntries(branches.map((b) => [b.id, b.name]));
+
+  useEffect(() => {
+    // Fetch branch list once for name lookups (low-stock table)
+    api.get<Branch[]>("/branches/").then(setBranches).catch(() => {});
+  }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -133,7 +146,7 @@ export default function AdminDashboard() {
   }
 
   const chartData = summary?.branches.map((b) => ({
-    name:      b.branch_id.slice(0, 8),
+    name:      b.branch_name,
     Revenue:   Number(b.revenue),
     Discounts: Number(b.discount),
   })) ?? [];
@@ -232,7 +245,10 @@ export default function AdminDashboard() {
                     </tr>
                   ) : (summary?.branches ?? []).map((b) => (
                     <tr key={b.branch_id} className="hover:bg-canvas/60 transition-colors">
-                      <td className="table-cell font-mono text-xs">{b.branch_id.slice(0, 16)}</td>
+                      <td className="table-cell">
+                        <div className="font-medium text-ink">{b.branch_name}</div>
+                        <div className="text-xs text-ink-faint font-mono mt-0.5">{b.branch_code}</div>
+                      </td>
                       <td className="table-cell text-right font-mono tabular-nums">{b.sales_count}</td>
                       <td className="table-cell text-right font-mono tabular-nums">
                         NPR {Number(b.revenue).toLocaleString("en-NP")}
@@ -262,6 +278,7 @@ export default function AdminDashboard() {
                   <thead>
                     <tr className="border-b border-border">
                       <th className="table-header text-left">Product</th>
+                      <th className="table-header text-left">Branch</th>
                       <th className="table-header text-right">Qty</th>
                       <th className="table-header text-right">Threshold</th>
                     </tr>
@@ -270,6 +287,11 @@ export default function AdminDashboard() {
                     {lowStock.map((p) => (
                       <tr key={p.id}>
                         <td className="table-cell">{p.name}</td>
+                        <td className="table-cell text-ink-muted">
+                          {branchMap[p.branch_id] ?? (
+                            <span className="font-mono text-xs">{p.branch_id.slice(0, 8)}</span>
+                          )}
+                        </td>
                         <td className="table-cell text-right font-mono tabular-nums text-signal-red font-semibold">{p.quantity}</td>
                         <td className="table-cell text-right font-mono tabular-nums text-ink-muted">{p.reorder_threshold}</td>
                       </tr>

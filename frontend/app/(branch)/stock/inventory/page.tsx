@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { api } from "@/lib/api";
+import { api, openBlobInTab } from "@/lib/api";
 import { getBranchId } from "@/lib/auth";
 import type { FrameProduct } from "@/lib/types";
 import { Table } from "@/components/ui/Table";
@@ -50,25 +50,17 @@ export default function InventoryPage() {
     setPrintLoading(true);
     try {
       const ids = [...selectedIds];
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001"}/inventory/frames/print-barcodes?use_stock_qty=false&copies_per_frame=1&label_size=34x20`,
+      const base = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001").replace(/\/$/, "");
+      await openBlobInTab(
+        `/inventory/frames/print-barcodes?use_stock_qty=false&copies_per_frame=1&label_size=34x20`,
+        "barcodes.pdf",
         {
           method: "POST",
-          headers: {
-            "Content-Type":  "application/json",
-            Authorization: `Bearer ${localStorage.getItem("access_token") || ""}`,
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(ids),
         },
       );
-      if (!res.ok) throw new Error(`Print failed: ${res.status}`);
-      const blob = await res.blob();
-      const url  = URL.createObjectURL(blob);
-      const a    = document.createElement("a");
-      a.href = url; a.download = "barcodes.pdf"; a.target = "_blank"; a.rel = "noopener noreferrer";
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
-      show("Labels ready", "success");
+      show("Labels opened in new tab — use browser print (Ctrl+P)", "success");
     } catch (e: unknown) {
       show(e instanceof Error ? e.message : "Print failed", "error");
     } finally {

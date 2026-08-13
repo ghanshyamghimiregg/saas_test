@@ -275,22 +275,21 @@ export default function POSPage() {
     async (q: string) => {
       if (!branchId || !q) return;
       setSearchLoading(true);
-      setSearchExhausted(false);
+      // Don't clear searchExhausted here — that would cause the flicker.
+      // It will be set to false only when we get actual results back.
       try {
         try {
           const frame = await api.get<FrameProduct>(`/inventory/frames/scan/${encodeURIComponent(q)}`);
           addToCart(frame);
           setSearchResults([]);
+          setSearchExhausted(false);
           return;
         } catch { /* barcode miss — fall through to text search */ }
         const results = await api.get<FrameProduct[]>(
           `/inventory/frames/search?branch_id=${branchId}&q=${encodeURIComponent(q)}&limit=10`,
         );
         setSearchResults(results);
-        // If text search also returns nothing, show the "add to inventory" prompt
-        if (results.length === 0) {
-          setSearchExhausted(true);
-        }
+        setSearchExhausted(results.length === 0);
       } catch (e: unknown) {
         show(e instanceof Error ? e.message : "Search failed", "error");
       } finally {
@@ -301,14 +300,18 @@ export default function POSPage() {
   );
 
   // Debounced type-ahead (not scanner — scanner uses Enter)
+  // searchExhausted is only cleared when input length drops below threshold,
+  // never at the start of a new search — this eliminates the flicker.
   useEffect(() => {
     if (!scanInput || scanInput.length < 2) {
       setSearchResults([]);
       setSearchExhausted(false);
       return;
     }
+    // While the user is still typing, don't show or hide the exhausted state —
+    // just wait for the debounce to settle before updating it.
     if (scanTimerRef.current) clearTimeout(scanTimerRef.current);
-    scanTimerRef.current = setTimeout(() => handleProductSearch(scanInput), 350);
+    scanTimerRef.current = setTimeout(() => handleProductSearch(scanInput), 400);
     return () => { if (scanTimerRef.current) clearTimeout(scanTimerRef.current); };
   }, [scanInput, handleProductSearch]);
 

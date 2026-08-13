@@ -123,9 +123,8 @@ export function BranchSidebarContent({ onClose }: { onClose?: () => void }) {
   );
 }
 
-export function BranchShell({ children, contentClassName }: {
+export function BranchShell({ children }: {
   children: React.ReactNode;
-  contentClassName?: string;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -165,12 +164,9 @@ export function BranchShell({ children, contentClassName }: {
         </div>
       )}
 
-      {/* ── Content ─────────────────────────────────────────────────────── */}
-      <div className={clsx("flex-1 flex flex-col min-w-0", contentClassName)}>
-
-        {/* Mobile top bar */}
+      {/* ── Content area — children decide their own overflow/padding ───── */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <MobileTopBar onOpen={() => setMobileOpen(true)} />
-
         {children}
       </div>
     </div>

@@ -2,7 +2,7 @@
 import { useState, useEffect, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { api } from "@/lib/api";
+import { api, openBlobInTab } from "@/lib/api";
 import { getBranchId } from "@/lib/auth";
 import type { Sale, SaleLineItem } from "@/lib/types";
 import { Table } from "@/components/ui/Table";
@@ -52,31 +52,22 @@ export default function SalesHistoryPage() {
     if (!frameItems.length) { show("No frame products in this sale", "info"); return; }
     setPrintLoading(true);
     try {
-      const base  = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
-      const token = localStorage.getItem("access_token") || "";
       const frameIds: string[] = [];
       for (const li of frameItems) {
         if (!li.frame_id) continue;
         const n = copies ? (copies[li.id] ?? li.quantity) : li.quantity;
         for (let i = 0; i < Math.max(1, n); i++) frameIds.push(li.frame_id);
       }
-      const res = await fetch(
-        `${base}/inventory/frames/print-barcodes?copies_per_frame=1&use_stock_qty=false&label_size=34x20`,
+      await openBlobInTab(
+        `/inventory/frames/print-barcodes?copies_per_frame=1&use_stock_qty=false&label_size=34x20`,
+        `labels-${sale.invoice_number ?? sale.id}.pdf`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(frameIds),
         },
       );
-      if (!res.ok) throw new Error(await res.text() || `Print failed: ${res.status}`);
-      const blob = await res.blob();
-      const url  = URL.createObjectURL(blob);
-      const a    = document.createElement("a");
-      a.href = url; a.download = `labels-${sale.invoice_number ?? sale.id}.pdf`;
-      a.target = "_blank"; a.rel = "noopener noreferrer";
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
-      show("Labels ready", "success");
+      show("Labels opened in new tab — use browser print (Ctrl+P)", "success");
     } catch (e: unknown) {
       show(e instanceof Error ? e.message : "Print failed", "error");
     } finally { setPrintLoading(false); }
