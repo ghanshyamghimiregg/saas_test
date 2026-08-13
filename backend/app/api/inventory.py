@@ -65,6 +65,11 @@ def print_barcodes(
         False,
         description="If true, print one label per unit of current stock quantity for each frame."
     ),
+    label_size: str = Query(
+        "a4",
+        description="Label size/layout: 'a4' for 3×8 grid on A4, '34x20' for 34×20mm thermal roll labels.",
+        pattern="^(a4|34x20)$",
+    ),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role(*_WRITE_ROLES)),
 ):
@@ -84,11 +89,12 @@ def print_barcodes(
         for _ in range(n):
             items.append((f.barcode, f.name, f.selling_price))
 
-    pdf = generate_barcode_pdf(items)
+    pdf = generate_barcode_pdf(items, label_size=label_size)
+    filename = f"barcodes-{'thermal' if label_size == '34x20' else 'a4'}.pdf"
     return StreamingResponse(
         pdf,
         media_type="application/pdf",
-        headers={"Content-Disposition": "attachment; filename=barcodes.pdf"},
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
 
 

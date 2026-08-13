@@ -4,27 +4,24 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { loginBranch, loginUser } from "@/lib/auth";
 import { Spinner } from "@/components/ui/Spinner";
 
-// Redirect map — where to go after login based on app type
 const REDIRECT: Record<string, string> = {
-  stock: "/stock/inventory",
-  sales: "/sales/pos",
-  admin: "/admin/dashboard",
-  branch: "/stock/inventory", // default branch landing
+  stock:  "/stock/inventory",
+  sales:  "/sales/pos",
+  admin:  "/admin/dashboard",
+  branch: "/stock/inventory",
 };
 
 function LoginForm() {
-  const router = useRouter();
-  const params = useSearchParams();
-  const appParam = params.get("app") || "stock"; // stock | sales | admin
+  const router   = useRouter();
+  const params   = useSearchParams();
+  const appParam = params.get("app") || "stock";
 
-  const [mode, setMode] = useState<"branch" | "admin">(
-    appParam === "admin" ? "admin" : "branch",
-  );
+  const [mode,       setMode]       = useState<"branch" | "admin">(appParam === "admin" ? "admin" : "branch");
   const [branchCode, setBranchCode] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [email,      setEmail]      = useState("");
+  const [password,   setPassword]   = useState("");
+  const [loading,    setLoading]    = useState(false);
+  const [error,      setError]      = useState<string | null>(null);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -33,7 +30,6 @@ function LoginForm() {
     try {
       if (mode === "branch") {
         await loginBranch(branchCode.trim().toUpperCase(), password);
-        // Redirect to the app they came from (sales → POS, stock → inventory)
         router.push(REDIRECT[appParam] ?? "/stock/inventory");
       } else {
         await loginUser(email.trim(), password);
@@ -46,56 +42,77 @@ function LoginForm() {
     }
   }
 
+  const isBranch = mode === "branch";
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-surface px-4">
       <div className="w-full max-w-sm">
-        <div className="mb-8 text-center">
-          <div className="inline-flex items-center gap-2 text-accent text-2xl font-bold tracking-tight">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-              <circle cx="6" cy="12" r="4" />
-              <circle cx="18" cy="12" r="4" />
-              <path d="M10 12h4" />
+
+        {/* Logo */}
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center gap-2.5 mb-3">
+            <svg
+              width="24" height="24" viewBox="0 0 24 24"
+              fill="none" stroke="#4f46e5" strokeWidth="2"
+              strokeLinecap="round" strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="6"  cy="12" r="4"/>
+              <circle cx="18" cy="12" r="4"/>
+              <path d="M10 12h4"/>
             </svg>
-            OptiStore
+            <span className="text-xl font-semibold tracking-tight text-ink">OptiStore</span>
           </div>
-          <p className="mt-1 text-sm text-slate-500">
-            {mode === "branch"
-              ? appParam === "sales" ? "POS terminal login" : "Branch terminal login"
-              : "Admin login"}
+          <p className="text-sm text-ink-muted">
+            {isBranch
+              ? (appParam === "sales" ? "POS terminal" : "Branch terminal")
+              : "Admin"}
           </p>
         </div>
 
-        <div className="card">
-          <div className="flex rounded-lg border border-border p-1 mb-6 gap-1">
+        {/* Card */}
+        <div className="card-flat shadow-modal">
+
+          {/* Mode toggle */}
+          <div
+            role="tablist"
+            aria-label="Login mode"
+            className="flex rounded-md border border-border p-1 mb-5 gap-1 bg-canvas"
+          >
             {(["branch", "admin"] as const).map((m) => (
               <button
                 key={m}
+                role="tab"
                 type="button"
+                aria-selected={mode === m}
                 onClick={() => { setMode(m); setError(null); }}
-                className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                className={[
+                  "flex-1 py-1.5 rounded text-xs font-medium transition-colors duration-150",
                   mode === m
-                    ? "bg-accent text-white"
-                    : "text-slate-500 hover:text-slate-700"
-                }`}
+                    ? "bg-white text-ink shadow-card"
+                    : "text-ink-muted hover:text-ink",
+                ].join(" ")}
               >
                 {m === "branch" ? "Branch" : "Admin"}
               </button>
             ))}
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {mode === "branch" ? (
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+            {isBranch ? (
               <div>
-                <label htmlFor="code" className="label">Branch code</label>
+                <label htmlFor="branch-code" className="label">Branch code</label>
                 <input
-                  id="code"
-                  className="input"
+                  id="branch-code"
+                  className="input font-mono tracking-widest uppercase"
                   placeholder="e.g. MAINBR"
                   value={branchCode}
                   onChange={(e) => setBranchCode(e.target.value)}
                   required
                   autoFocus
                   autoComplete="username"
+                  spellCheck={false}
                 />
               </div>
             ) : (
@@ -121,7 +138,7 @@ function LoginForm() {
                 id="password"
                 type="password"
                 className="input"
-                placeholder="••••••••••"
+                placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -130,12 +147,16 @@ function LoginForm() {
             </div>
 
             {error && (
-              <p role="alert" className="text-sm text-red-600 bg-red-50 rounded-md px-3 py-2">
+              <div role="alert" className="alert-error text-sm">
                 {error}
-              </p>
+              </div>
             )}
 
-            <button type="submit" className="btn-primary w-full" disabled={loading}>
+            <button
+              type="submit"
+              className="btn-primary w-full mt-1"
+              disabled={loading}
+            >
               {loading ? <Spinner size={4} /> : "Sign in"}
             </button>
           </form>
@@ -145,12 +166,11 @@ function LoginForm() {
   );
 }
 
-// Suspense required by Next.js 14 when using useSearchParams in a page
 export default function LoginPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center">
-        <div className="w-5 h-5 rounded-full border-2 border-slate-200 border-t-accent animate-spin" />
+        <Spinner size={6} label="Loading…" />
       </div>
     }>
       <LoginForm />

@@ -4,23 +4,27 @@ import { useRouter, useParams } from "next/navigation";
 import { api } from "@/lib/api";
 import type { FrameProduct } from "@/lib/types";
 import { ProductForm } from "../ProductForm";
-import { Spinner } from "@/components/ui/Spinner";
+import { PageSpinner } from "@/components/ui/Spinner";
 import { Toast, useToast } from "@/components/ui/Toast";
 
 export default function EditProductPage() {
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
-  const [product, setProduct] = useState<FrameProduct | null>(null);
+  const [product,        setProduct]        = useState<FrameProduct | null>(null);
   const [loadingProduct, setLoadingProduct] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [notFound,       setNotFound]       = useState(false);
+  const [saving,         setSaving]         = useState(false);
   const { toast, show, dismiss } = useToast();
 
   useEffect(() => {
     api.get<FrameProduct>(`/inventory/frames/${id}`)
       .then(setProduct)
-      .catch((e: unknown) => show(e instanceof Error ? e.message : "Failed to load", "error"))
+      .catch((e: unknown) => {
+        if (e instanceof Error && e.message.includes("404")) setNotFound(true);
+        else show(e instanceof Error ? e.message : "Failed to load", "error");
+      })
       .finally(() => setLoadingProduct(false));
-  }, [id]);
+  }, [id]); // eslint-disable-line
 
   async function handleSubmit(data: Record<string, unknown>) {
     setSaving(true);
@@ -30,13 +34,11 @@ export default function EditProductPage() {
       setTimeout(() => router.push("/stock/inventory"), 600);
     } catch (e: unknown) {
       show(e instanceof Error ? e.message : "Failed to save", "error");
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   }
 
   async function handleDeactivate() {
-    if (!confirm("Deactivate this product? It will no longer appear in inventory but sale history is preserved.")) return;
+    if (!confirm("Deactivate this product? It will no longer appear in inventory — sale history is preserved.")) return;
     try {
       await api.delete(`/inventory/frames/${id}`);
       show("Product deactivated", "success");
@@ -46,49 +48,82 @@ export default function EditProductPage() {
     }
   }
 
-  if (loadingProduct) {
-    return <div className="flex justify-center py-20"><Spinner size={8} /></div>;
-  }
-  if (!product) {
-    return <div className="text-center py-20 text-slate-400">Product not found</div>;
+  if (loadingProduct) return <PageSpinner label="Loading product…" />;
+
+  if (notFound || !product) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <p className="text-sm font-medium text-ink-muted">Product not found</p>
+        <p className="text-xs text-ink-faint mt-1 mb-4">It may have been deleted or the ID is incorrect.</p>
+        <button className="btn-secondary btn-sm" onClick={() => router.push("/stock/inventory")}>
+          ← Back to inventory
+        </button>
+      </div>
+    );
   }
 
   return (
     <>
       <div className="max-w-3xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-3">
-            <button onClick={() => router.back()} className="text-slate-400 hover:text-slate-700 text-lg" aria-label="Back">←</button>
+            <button
+              onClick={() => router.back()}
+              className="btn-ghost btn-sm"
+              aria-label="Go back"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                <path d="M19 12H5M12 5l-7 7 7 7"/>
+              </svg>
+            </button>
             <h1>Edit product</h1>
           </div>
-          <button className="btn-danger btn-sm" onClick={handleDeactivate}>
+          <button
+            className="btn-danger btn-sm"
+            onClick={handleDeactivate}
+            aria-label="Deactivate product"
+          >
             Deactivate
           </button>
         </div>
 
-        <div className="card mb-4">
-          <div className="flex items-center gap-4 text-sm">
-            <div>
-              <span className="text-slate-400">Barcode:</span>{" "}
-              <span className="font-mono font-medium">{product.barcode}</span>
+        {/* Identity badge */}
+        <div className="card-flat mb-4 flex flex-wrap items-center gap-x-5 gap-y-1 text-xs">
+          <div className="flex items-center gap-1.5">
+            <span className="text-ink-faint">Barcode</span>
+            <span className="font-mono font-semibold text-ink tracking-wide">{product.barcode}</span>
+          </div>
+          {product.sku && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-ink-faint">SKU</span>
+              <span className="font-mono text-ink">{product.sku}</span>
             </div>
-            {product.sku && (
-              <div>
-                <span className="text-slate-400">SKU:</span>{" "}
-                <span className="font-mono">{product.sku}</span>
-              </div>
-            )}
+          )}
+          {product.product_code && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-ink-faint">Code</span>
+              <span className="font-mono text-ink">{product.product_code}</span>
+            </div>
+          )}
+          <div className="flex items-center gap-1.5 ml-auto">
+            <span className={product.is_active ? "badge-green" : "badge-gray"}>
+              {product.is_active ? "Active" : "Inactive"}
+            </span>
           </div>
         </div>
 
-        <div className="card">
+        {/* Form */}
+        <div className="card-flat">
           <ProductForm
             defaultValues={product as Parameters<typeof ProductForm>[0]["defaultValues"]}
             onSubmit={handleSubmit as Parameters<typeof ProductForm>[0]["onSubmit"]}
             loading={saving}
+            submitLabel="Save changes"
           />
         </div>
       </div>
+
       {toast && <Toast message={toast.message} type={toast.type} onDismiss={dismiss} />}
     </>
   );
