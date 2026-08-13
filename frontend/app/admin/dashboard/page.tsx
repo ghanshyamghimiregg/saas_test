@@ -84,12 +84,16 @@ function PeriodToggle({ value, onChange }: { value: Period; onChange: (p: Period
 
 // ── Custom tooltip ────────────────────────────────────────────────────────────
 function ChartTooltip({ active, payload, label }: {
-  active?: boolean; payload?: { name: string; value: number; fill: string }[]; label?: string;
+  active?: boolean; payload?: { name: string; value: number; fill: string; payload?: { fullName?: string } }[]; label?: string;
 }) {
   if (!active || !payload?.length) return null;
+  const fullName = payload[0]?.payload?.fullName;
   return (
     <div className="bg-white border border-border rounded-md shadow-popover px-3 py-2 text-xs">
-      <p className="font-mono font-semibold text-ink mb-1">{label}</p>
+      <p className="font-semibold text-ink mb-1">{fullName || label}</p>
+      {fullName && fullName !== label && (
+        <p className="font-mono text-ink-faint text-2xs mb-1">{label}</p>
+      )}
       {payload.map((p) => (
         <p key={p.name} className="text-ink-muted">
           {p.name}:{" "}
@@ -146,7 +150,9 @@ export default function AdminDashboard() {
   }
 
   const chartData = summary?.branches.map((b) => ({
-    name:      b.branch_name,
+    // Use branch_code for chart X-axis (short, fits in bar chart label)
+    name:      b.branch_code,
+    fullName:  b.branch_name,
     Revenue:   Number(b.revenue),
     Discounts: Number(b.discount),
   })) ?? [];
@@ -246,8 +252,14 @@ export default function AdminDashboard() {
                   ) : (summary?.branches ?? []).map((b) => (
                     <tr key={b.branch_id} className="hover:bg-canvas/60 transition-colors">
                       <td className="table-cell">
-                        <div className="font-medium text-ink">{b.branch_name}</div>
-                        <div className="text-xs text-ink-faint font-mono mt-0.5">{b.branch_code}</div>
+                        <div className="font-medium text-ink leading-snug">
+                          {b.branch_name !== b.branch_code ? b.branch_name : "—"}
+                        </div>
+                        <div className="mt-0.5">
+                          <span className="badge-blue font-mono tracking-wide text-2xs">
+                            {b.branch_code}
+                          </span>
+                        </div>
                       </td>
                       <td className="table-cell text-right font-mono tabular-nums">{b.sales_count}</td>
                       <td className="table-cell text-right font-mono tabular-nums">
