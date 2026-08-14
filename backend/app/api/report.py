@@ -18,8 +18,8 @@ router = APIRouter(prefix="/reports", tags=["Reports"])
 
 
 # ── Branch-accessible endpoints ───────────────────────────────────────────────
-# Use get_current_user (no role gate). verify_branch_access enforces that a
-# branch terminal can only read its own branch. Admins/Managers read any.
+# These use ONLY get_current_user — no require_role at all.
+# verify_branch_access provides isolation (branch can only see own data).
 
 @router.get("/sales/summary", response_model=SalesSummaryOut)
 def sales_summary(
@@ -54,21 +54,13 @@ def export_excel(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """
-    Admin: export all branches or one specific branch.
-    Branch terminal / Staff / Manager: always scoped to their own branch.
-    """
     from app.core.deps import BranchPrincipal
-
     if isinstance(current_user, BranchPrincipal):
-        # Branch terminal — force scope to their own branch, ignore branch_id param
         branch_id = current_user.branch_id
     elif current_user.role == UserRole.ADMIN:
-        # Admin — honour branch_id param (None = all branches)
         if branch_id:
             verify_branch_access(current_user, branch_id)
     else:
-        # Manager / Staff — scope to their own branch
         if branch_id:
             verify_branch_access(current_user, branch_id)
         else:
