@@ -93,6 +93,8 @@ def get_all_branches_summary(db: Session, period: str) -> dict:
     else:
         raise ValueError("period must be daily/weekly/monthly/yearly")
 
+    from app.models.branch import Branch
+
     rows = (
         db.query(
             Sale.branch_id,
@@ -104,20 +106,28 @@ def get_all_branches_summary(db: Session, period: str) -> dict:
         .group_by(Sale.branch_id)
         .all()
     )
+
+    # Resolve branch names in a single extra query — avoids JOIN grouping issues
+    branch_ids = [r.branch_id for r in rows]
+    branches   = db.query(Branch).filter(Branch.id.in_(branch_ids)).all() if branch_ids else []
+    branch_map = {b.id: b for b in branches}
+
     return {
         "period": period,
         "period_start": start.date(),
         "period_end": now.date(),
         "branches": [
             {
-                "branch_id": str(r.branch_id),
-                "revenue": r.revenue,
+                "branch_id":   str(r.branch_id),
+                "branch_name": branch_map[r.branch_id].name if r.branch_id in branch_map else str(r.branch_id)[:8],
+                "branch_code": branch_map[r.branch_id].code if r.branch_id in branch_map else str(r.branch_id)[:8],
+                "revenue":     r.revenue,
                 "sales_count": r.sales_count,
-                "discount": r.discount,
+                "discount":    r.discount,
             }
             for r in rows
         ],
-        "total_revenue": sum(r.revenue for r in rows),
+        "total_revenue":     sum(r.revenue for r in rows),
         "total_sales_count": sum(r.sales_count for r in rows),
     }
 
@@ -189,20 +199,39 @@ def build_excel_report(
             max_len = max((len(str(c.value or "")) for c in col_cells), default=0)
             ws.column_dimensions[get_column_letter(col_cells[0].column)].width = min(max_len + 4, 50)
 
+    # Build lookup maps for branches and customers once
+    from app.models.branch import Branch
+    all_branches = db.query(Branch).all()
+    branch_name_map: dict = {b.id: b.name for b in all_branches}
+
+    all_customers = db.query(Customer).all()
+    customer_phone_map: dict = {c.id: (c.phone or c.full_name or str(c.id)[:8]) for c in all_customers}
+
     # ---- Sheet 1: Sales Detail ----
     ws1 = wb.active
     ws1.title = "Sales Detail"
-    headers1 = ["Invoice #", "Branch", "Date", "Customer", "Discount Type",
-                "Discount %", "Subtotal", "Tax", "Total", "Payment Method", "Status"]
+    headers1 = [
+        "Invoice #", "Branch", "Date", "Customer Phone",
+        "Items Bought", "Discount Type", "Discount %",
+        "Subtotal", "Tax", "Total", "Payment Method", "Status",
+    ]
     style_header(ws1, headers1)
 
     sales = get_all_branches_sales_list(db, start, end, branch_id=branch_id, limit=10000)
     for sale in sales:
+        # Sum all line item quantities for "items bought"
+        items_bought = sum(li.quantity for li in sale.line_items) if sale.line_items else 0
+        # Resolve branch name
+        branch_name = branch_name_map.get(sale.branch_id, str(sale.branch_id)[:8])
+        # Resolve customer phone (fall back to name, then blank)
+        customer_str = customer_phone_map.get(sale.customer_id, "") if sale.customer_id else ""
+
         ws1.append([
             sale.invoice_number,
-            str(sale.branch_id),
+            branch_name,
             sale.created_at.strftime("%Y-%m-%d %H:%M") if sale.created_at else "",
-            str(sale.customer_id) if sale.customer_id else "",
+            customer_str,
+            items_bought,
             sale.discount_type.value if sale.discount_type else "",
             float(sale.discount_pct or 0),
             float(sale.subtotal or 0),
@@ -224,7 +253,7 @@ def build_excel_report(
         inv_q = inv_q.filter(FrameProduct.branch_id == branch_id)
     for fp in inv_q.all():
         ws2.append([
-            str(fp.branch_id),
+            branch_name_map.get(fp.branch_id, str(fp.branch_id)[:8]),
             fp.sku or fp.product_code,
             fp.barcode,
             fp.name,
@@ -251,7 +280,8 @@ def build_excel_report(
         ls_q = ls_q.filter(FrameProduct.branch_id == branch_id)
     for fp in ls_q.all():
         ws3.append([
-            str(fp.branch_id), fp.barcode, fp.name,
+            branch_name_map.get(fp.branch_id, str(fp.branch_id)[:8]),
+            fp.barcode, fp.name,
             fp.quantity, fp.reorder_threshold or 0,
             (fp.reorder_threshold or 0) - fp.quantity,
         ])
@@ -292,8 +322,9 @@ def build_excel_report(
     style_header(ws5, headers5)
 
     from app.services.discount import get_membership_tier
-    customers = db.query(Customer).filter(Customer.is_active == True).all()  # noqa: E712
-    for c in customers:
+    for c in all_customers:
+        if not c.is_active:
+            continue
         _, tier_name = get_membership_tier(db, c.purchase_count)
         ws5.append([
             c.full_name, c.phone or "", c.purchase_count,
