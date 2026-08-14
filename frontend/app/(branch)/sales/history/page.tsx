@@ -1,4 +1,5 @@
 "use client";
+// v2 — branch sales history with permissions fix
 import { useState, useEffect, useCallback, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { api, openBlobInTab } from "@/lib/api";
