@@ -150,9 +150,8 @@ export default function AdminDashboard() {
   }
 
   const chartData = summary?.branches.map((b) => ({
-    // Use branch_code for chart X-axis (short, fits in bar chart label)
     name:      b.branch_code,
-    fullName:  b.branch_name,
+    fullName:  branchMap[b.branch_id] || b.branch_name || b.branch_code,
     Revenue:   Number(b.revenue),
     Discounts: Number(b.discount),
   })) ?? [];
@@ -252,7 +251,9 @@ export default function AdminDashboard() {
                   ) : (summary?.branches ?? []).map((b) => (
                     <tr key={b.branch_id} className="hover:bg-canvas/60 transition-colors">
                       <td className="table-cell">
-                        <div className="font-medium text-ink leading-snug">{b.branch_name}</div>
+                        <div className="font-medium text-ink leading-snug">
+                          {branchMap[b.branch_id] || b.branch_name || b.branch_code}
+                        </div>
                         <div className="mt-0.5">
                           <span className="badge-blue font-mono tracking-wide text-2xs">
                             {b.branch_code}
